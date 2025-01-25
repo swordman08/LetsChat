@@ -1,0 +1,34 @@
+// Source code is decompiled from a .class file using FernFlower decompiler.
+import java.net.Socket;
+
+public class Client {
+   private Socket connection;
+   private String username;
+   private int score;
+
+   public Client(Socket var1, String var2) {
+      this.connection = var1;
+      this.username = var2;
+      this.score = 0;
+   }
+
+   public String getUsername() {
+      return this.username;
+   }
+
+   public void setUsername(String var1) {
+      this.username = var1;
+   }
+
+   public Socket getConnection() {
+      return this.connection;
+   }
+
+   public void addScore(int var1) {
+      this.score += var1;
+   }
+
+   public int getScore() {
+      return this.score;
+   }
+}
