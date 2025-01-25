@@ -1,0 +1,192 @@
+// Source code is decompiled from a .class file using FernFlower decompiler.
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Iterator;
+
+public class ClientHandler implements Runnable {
+   private final Client client;
+   private final ArrayList<Client> clientList;
+   private final MtServer server;
+   private boolean questionActive = false;
+   private boolean correctAnswer;
+   private boolean hostPresent = false;
+
+   public ClientHandler(Client var1, ArrayList<Client> var2, MtServer var3) {
+      this.client = var1;
+      this.clientList = var2;
+      this.server = var3;
+   }
+
+   public void run() {
+      try {
+         System.out.println("Connection made with socket " + String.valueOf(this.client.getConnection()));
+         BufferedReader var1 = new BufferedReader(new InputStreamReader(this.client.getConnection().getInputStream()));
+         DataOutputStream var2 = new DataOutputStream(this.client.getConnection().getOutputStream());
+         String var3;
+         if (!this.server.getHostAssigned()) {
+            var3 = "Host";
+            var2.writeBytes("You are now the host of the game.\n");
+            this.sendAvailableCommands(var2);
+            this.server.setHostAssigned();
+         } else {
+            do {
+               var2.writeBytes("Welcome! Please enter your username:\n");
+               var3 = var1.readLine();
+               if (!this.server.isUsernameAvailable(var3)) {
+                  var2.writeBytes("Username is already taken, please try another one:\n");
+               } else {
+                  var2.writeBytes("Your username has been accepted. \n");
+                  this.sendAvailableCommands(var2);
+               }
+            } while(!this.server.isUsernameAvailable(var3));
+         }
+
+         this.client.setUsername(var3);
+         this.server.addUsername(var3);
+         this.clientList.add(this.client);
+         this.broadcastMessage(this.client.getUsername() + " has joined the chat");
+
+         while(true) {
+            String var4;
+            byte var6;
+            StringBuilder var7;
+            Client var9;
+            Iterator var14;
+            do {
+               if ((var4 = var1.readLine()) == null) {
+                  return;
+               }
+
+               if (!this.client.getUsername().equals("Host")) {
+                  if (this.questionActive) {
+                     System.out.print("" + this.correctAnswer);
+                     if (!var4.equalsIgnoreCase("True") && !var4.equalsIgnoreCase("False")) {
+                        var2.writeBytes("Incorrect answer. Try again!\n");
+                     } else {
+                        boolean var12 = Boolean.parseBoolean(var4);
+                        if (var12 == this.correctAnswer) {
+                           this.client.addScore(10);
+                           this.broadcastMessage(this.client.getUsername() + " answered correctly and scores 10 points!");
+                           this.questionActive = false;
+                        }
+                     }
+                  }
+               } else {
+                  switch (var4.split(" ")[0]) {
+                     case "QUESTION":
+                        if (!this.questionActive) {
+                           String[] var13 = var4.split(" ", 3);
+                           if (var13.length < 3) {
+                              return;
+                           }
+
+                           this.correctAnswer = Boolean.parseBoolean(var13[1]);
+                           this.broadcastMessage("Quiz Question: " + var13[2] + " \n");
+                           var2.writeBytes("Quiz Question: " + var13[2] + " \n");
+                           System.out.println("Quiz Question: " + var13[2]);
+                           this.questionActive = true;
+                        }
+                        break;
+                     case "SCORES":
+                        var7 = new StringBuilder("Current scores: \n");
+                        var14 = this.clientList.iterator();
+
+                        while(var14.hasNext()) {
+                           var9 = (Client)var14.next();
+                           var7.append(var9.getUsername()).append(": ").append(var9.getScore()).append("\n");
+                        }
+
+                        var2.writeBytes(var7.toString());
+                        this.broadcastMessage(var7.toString());
+                        System.out.println(var7.toString());
+                        break;
+                     case "ADDPOINTS":
+                        String[] var8 = var4.split(" ", 3);
+                        this.addPointsToClient(var8[1], Integer.parseInt(var8[2]));
+                  }
+               }
+            } while(this.questionActive);
+
+            switch (var4) {
+               case "Goodbye":
+                  System.out.print(this.client.getUsername() + " has left the chat");
+                  this.broadcastMessage(this.client.getUsername() + " has left the chat ");
+                  this.server.removeUsername(this.client.getUsername());
+                  this.client.getConnection().close();
+                  this.clientList.remove(this.client);
+                  return;
+               case "Who?":
+                  var7 = new StringBuilder("Online users: ");
+                  var14 = this.clientList.iterator();
+
+                  while(var14.hasNext()) {
+                     var9 = (Client)var14.next();
+                     var7.append(var9.getUsername()).append(", ");
+                  }
+
+                  if (var7.length() > 13) {
+                     var7.setLength(var7.length() - 2);
+                  }
+
+                  var2.writeBytes(var7.toString() + "\n");
+                  System.out.println("" + String.valueOf(var7));
+                  break;
+               default:
+                  PrintStream var10000 = System.out;
+                  String var10001 = this.client.getUsername();
+                  var10000.println("Received from " + var10001 + ": " + var4);
+                  var10001 = this.client.getUsername();
+                  this.broadcastMessage(var10001 + ": " + var4);
+            }
+         }
+      } catch (Exception var11) {
+         System.out.println("Error: " + var11.toString());
+
+         try {
+            this.server.removeUsername(this.client.getUsername());
+            this.clientList.remove(this.client);
+            this.client.getConnection().close();
+         } catch (IOException var10) {
+            System.out.println("Error closing connection: " + var10.getMessage());
+         }
+      }
+
+   }
+
+   private void broadcastMessage(String var1) throws IOException {
+      Iterator var2 = this.clientList.iterator();
+
+      while(var2.hasNext()) {
+         Client var3 = (Client)var2.next();
+         if (!var3.equals(this.client)) {
+            DataOutputStream var4 = new DataOutputStream(var3.getConnection().getOutputStream());
+            var4.writeBytes(var1 + "\n");
+         }
+      }
+
+   }
+
+   private void sendAvailableCommands(DataOutputStream var1) throws IOException {
+      StringBuilder var2 = new StringBuilder();
+      var2.append("Available commands:\n").append("1. Who? - Lists all connected users\n").append("2. Goodbye - Disconnect from server\n").append("3. SCORES - Displays current scores (Host only)\n").append("4. QUESTION <answer> <question> - Send a quiz question (Host only)\n").append("5. ADDPOINTS name amountofpointstoadd \n");
+      var1.writeBytes(var2.toString());
+   }
+
+   private void addPointsToClient(String var1, int var2) throws IOException {
+      Iterator var3 = this.clientList.iterator();
+
+      while(var3.hasNext()) {
+         Client var4 = (Client)var3.next();
+         if (var4.getUsername().equalsIgnoreCase(var1)) {
+            var4.addScore(var2);
+            this.broadcastMessage(var1 + " has been awarded " + var2 + " points!");
+            System.out.println(var1 + " has been awarded " + var2 + " points!");
+         }
+      }
+
+   }
+}
