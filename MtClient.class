@@ -1,0 +1,37 @@
+// Source code is decompiled from a .class file using FernFlower decompiler.
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.Socket;
+import java.util.Scanner;
+
+public class MtClient {
+   public MtClient() {
+   }
+
+   public static void main(String[] var0) {
+      try {
+         String var1 = "localhost";
+         short var2 = 9004;
+         System.out.println("Connecting to server on port " + var2);
+         Socket var3 = new Socket(var1, var2);
+         DataOutputStream var4 = new DataOutputStream(var3.getOutputStream());
+         System.out.println("Connection made.");
+         ClientListener var5 = new ClientListener(var3);
+         Thread var6 = new Thread(var5);
+         var6.start();
+         Scanner var7 = new Scanner(System.in);
+
+         while(true) {
+            String var8;
+            do {
+               var8 = var7.nextLine();
+               var4.writeBytes(var8 + "\n");
+            } while(!var8.equals("Goodbye"));
+
+            System.exit(0);
+         }
+      } catch (IOException var9) {
+         System.out.println(var9.getMessage());
+      }
+   }
+}
